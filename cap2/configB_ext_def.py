@@ -20,19 +20,19 @@ from scipy.stats import zscore
 RUTA_X = Path("X_mapper.npy")
 assert RUTA_X.exists(), "No se encuentra X_mapper.npy"
 
-# nombres 15 caracteristicas (en castellano, sin tildes)
+# nombres 15 características
 nombres_caract = [
-    "seg1_media","seg1_desv","seg1_asim",
-    "seg2_media","seg2_desv","seg2_asim",
-    "seg3_media","seg3_desv","seg3_asim",
-    "LF","HF","RR_media","RR_desv","amp_max","amp_min"
+    "seg1_media","seg1_desv","seg1_asimetria",
+    "seg2_media","seg2_desv","seg2_asimetria",
+    "seg3_media","seg3_desv","seg3_asimetria",
+    "LF","HF","RR_media","RR_desv","amplitud_max","amplitud_min"
 ]
 
 # carga
 X = np.load(RUTA_X)
 if X.ndim != 2:
     raise ValueError("X debe ser 2D")
-assert X.shape[1] == 15, f"tendría que haber 15 columnas, hay {X.shape[1]}"
+assert X.shape[1] == 15, f"Esperaba 15 columnas, obtuve {X.shape[1]}"
 
 # previo
 escalador   = StandardScaler()
@@ -51,7 +51,7 @@ umap_pos2d = umap.UMAP(
     random_state = 42
 ).fit_transform(X_pca)
 
-# funcion filtro: excentricidad kNN
+# función filtro: excentricidad kNN
 def exc_knn(X_emb, k = 50):
     vecinos       = NearestNeighbors(n_neighbors = k + 1, metric = "euclidean", n_jobs = 1).fit(X_emb)
     distancias, _ = vecinos.kneighbors(X_emb, return_distance = True)
@@ -62,59 +62,49 @@ k_exc   = 30
 exc_1d  = exc_knn(X_pca, k = k_exc)
 exc_z   = (exc_1d - np.mean(exc_1d)) / (np.std(exc_1d) + 1e-8)
 
-# vectores caracteristicas (fisiologicos y morfologicos)
-ix_LF       = nombres_caract.index("LF")
-ix_HF       = nombres_caract.index("HF")
-ix_RRmedia  = nombres_caract.index("RR_media")
-ix_RRdesv   = nombres_caract.index("RR_desv")
-ix_amp_max  = nombres_caract.index("amp_max")
-ix_amp_min  = nombres_caract.index("amp_min")
-ix_s1_asim  = nombres_caract.index("seg1_asim")
-ix_s2_asim  = nombres_caract.index("seg2_asim")
-ix_s3_asim  = nombres_caract.index("seg3_asim")
+# vectores características
+ix_LF         = nombres_caract.index("LF")
+ix_HF         = nombres_caract.index("HF")
+ix_RRmedia    = nombres_caract.index("RR_media")
+ix_RRdesv     = nombres_caract.index("RR_desv")
+ix_amp_max    = nombres_caract.index("amplitud_max")
+ix_amp_min    = nombres_caract.index("amplitud_min")
+ix_s1_asim    = nombres_caract.index("seg1_asimetria")
+ix_s2_asim    = nombres_caract.index("seg2_asimetria")
+ix_s3_asim    = nombres_caract.index("seg3_asimetria")
 
-vector_LF          = X[:, ix_LF]
-vector_HF          = X[:, ix_HF]
-vector_RR_media    = X[:, ix_RRmedia]
-vector_RR_desv     = X[:, ix_RRdesv]
-vector_amp_max     = X[:, ix_amp_max]
-vector_amp_min     = X[:, ix_amp_min]
-vector_seg1_asim   = X[:, ix_s1_asim]
-vector_seg2_asim   = X[:, ix_s2_asim]
-vector_seg3_asim   = X[:, ix_s3_asim]
+LF_vector             = X[:, ix_LF]
+HF_vector             = X[:, ix_HF]
+RR_media_vector       = X[:, ix_RRmedia]
+RR_desv_vector        = X[:, ix_RRdesv]
+amplitud_max_vector   = X[:, ix_amp_max]
+amplitud_min_vector   = X[:, ix_amp_min]
+seg1_asim_vector      = X[:, ix_s1_asim]
+seg2_asim_vector      = X[:, ix_s2_asim]
+seg3_asim_vector      = X[:, ix_s3_asim]
 
 # derivados
-HF_seguro    = np.clip(vector_HF, 1e-8, np.percentile(vector_HF, 99.9))
-LF_HF_ratio  = vector_LF / HF_seguro
-rango_amp    = vector_amp_max - vector_amp_min
+HF_seguro        = np.clip(HF_vector, 1e-8, np.percentile(HF_vector, 99.9))
+LF_HF_ratio      = LF_vector / HF_seguro
+rango_amp_vector = amplitud_max_vector - amplitud_min_vector
 
 # para el grafo
 def grafo_a_networkx(dic):
     G = nx.Graph()
-    for nid, miembros in dic["nodes"].items():
-        G.add_node(nid, tamano = len(miembros))
-
-    enlaces = dic.get("links", [])
-    if isinstance(enlaces, dict):
-        for a, vec in enlaces.items():
-            for b in vec:
-                G.add_edge(a, b)
-    else:
-        for link in enlaces:
-            if isinstance(link, (list, tuple)) and len(link) >= 2:
-                G.add_edge(link[0], link[1])
-            elif isinstance(link, dict):
-                a = link.get("source", link.get("from"))
-                b = link.get("target", link.get("to"))
-                if a is not None and b is not None:
-                    G.add_edge(a, b)
+    
+    for id_nodo, indices in dic["nodes"].items():
+        G.add_node(id_nodo, tamaño=len(indices))
+    enlaces = dic.get("links", [])   
+    for origen, destino in enlaces:
+        G.add_edge(origen, destino)
+    
     return G
 
 def posiciones_umap(dic, umap_coords):
     pos = {}
-    for nid, idxs in dic["nodes"].items():
+    for id_nodo, idxs in dic["nodes"].items():
         pts = umap_coords[np.array(idxs)]
-        pos[nid] = pts.mean(axis = 0)
+        pos[id_nodo] = pts.mean(axis = 0)
     return pos
 
 def dibujar_png(dic, pos, valores_nodo = None, titulo = "", salida = "salida.png",
@@ -130,24 +120,15 @@ def dibujar_png(dic, pos, valores_nodo = None, titulo = "", salida = "salida.png
         nx.draw_networkx_nodes(G, pos, ax = ax, node_size = tamanos, node_color = "#3182bd")
 
     else:
-        vals  = np.array([valores_nodo.get(n, np.nan) for n in G.nodes()])
-        fin   = vals[np.isfinite(vals)]
-        fill  = np.nanmedian(fin) if fin.size > 0 else 0.0
-        vals  = np.nan_to_num(
-            vals,
-            nan    = fill,
-            posinf = fin.max() if fin.size > 0 else 0,
-            neginf = fin.min() if fin.size > 0 else 0
-        )
+        vals   = np.array([valores_nodo.get(n, np.nan) for n in G.nodes()])
+        fin    = vals[np.isfinite(vals)]
+        fill   = np.nanmedian(fin) if fin.size > 0 else 0.0
+        vals   = np.nan_to_num(vals, nan = fill, posinf = fin.max() if fin.size > 0 else 0,
+                                         neginf = fin.min() if fin.size > 0 else 0)
 
-        nodos = nx.draw_networkx_nodes(
-            G, pos, ax = ax,
-            node_size  = tamanos,
-            node_color = vals,
-            cmap       = "viridis",
-            vmin       = vmin,
-            vmax       = vmax
-        )
+        nodos  = nx.draw_networkx_nodes(G, pos, ax = ax, node_size = tamanos,
+                                        node_color = vals, cmap = "viridis",
+                                        vmin = vmin, vmax = vmax)
 
         norm = mpl.colors.Normalize(
             vmin = np.min(vals) if vmin is None else vmin,
@@ -166,13 +147,11 @@ def dibujar_png(dic, pos, valores_nodo = None, titulo = "", salida = "salida.png
     print("PNG:", salida)
 
 def media_por_nodo(dic, vec):
-    return {
-        nid: float(np.mean(vec[np.array(idxs)]))
-        for nid, idxs in dic["nodes"].items()
-    }
+    return {id_nodo: float(np.mean(vec[np.array(idxs)]))
+            for id_nodo, idxs in dic["nodes"].items()}
 
-# construccion Mapper
-mapeador    = km.KeplerMapper(verbose = 1)
+# construcción Mapper
+kmapper    = km.KeplerMapper(verbose = 1)
 cubrimiento = km.Cover(n_cubes = 22, perc_overlap = 0.50)
 
 clusterer = hdbscan.HDBSCAN(
@@ -181,7 +160,7 @@ clusterer = hdbscan.HDBSCAN(
     prediction_data  = True
 )
 
-grafo = mapeador.map(
+grafo = kmapper.map(
     exc_z.reshape(-1, 1),
     X_pca,
     cover     = cubrimiento,
@@ -195,11 +174,11 @@ n_aristas = G.number_of_edges()
 deg       = dict(G.degree())
 aislados  = sum(1 for d in deg.values() if d == 0)
 
-porc_aisl        = 100.0 * aislados / n_nodos if n_nodos else 0.0
-componentes      = list(nx.connected_components(G))
+porc_aisl = 100.0 * aislados / n_nodos if n_nodos else 0.0
+componentes = list(nx.connected_components(G))
 aristas_por_nodo = n_aristas / n_nodos if n_nodos else float("nan")
 mayor_comp       = max((len(c) for c in componentes), default = 0)
-porc_mayor_comp  = mayor_comp / n_nodos * 100 if n_nodos else 0.0
+porc_mayor_comp  = mayor_comp / n_nodos * 100 if n_nodos else 0
 
 print(
     f"nodos: {n_nodos}  aristas: {n_aristas}  comp: {len(componentes)}  "
@@ -211,10 +190,10 @@ print(
 X_num  = pd.DataFrame(X, columns = nombres_caract).values
 html_B = "mapper_configuracionB.html"
 
-mapeador.visualize(
+kmapper.visualize(
     grafo,
     path_html           = html_B,
-    title               = "Configuracion B",
+    title               = "Configuración B",
     X                   = X_num,
     X_names             = nombres_caract,
     color_values        = exc_z.reshape(-1, 1),
@@ -225,9 +204,9 @@ print("HTML base:", html_B)
 
 # png base
 pos = posiciones_umap(grafo, umap_pos2d)
-dibujar_png(grafo, pos, titulo = "Configuracion B", salida = "mapper_configB_base.png")
+dibujar_png(grafo, pos, titulo = "Configuración B", salida = "mapper_configB_base.png")
 
-# medidas extra de rareza
+# medidas extra
 k_knn   = 30
 vecinos = NearestNeighbors(n_neighbors = k_knn + 1, metric = "euclidean").fit(X_pca)
 dist_knn_bruto, _ = vecinos.kneighbors(X_pca)
@@ -239,26 +218,26 @@ score_lof = -lof.negative_outlier_factor_
 
 extra = {
     "Excentricidad_Z" : exc_z,
-    "kNN_Dist"        : dist_knn,
-    "LOF_score"       : score_lof
+    "Dist_kNN"        : dist_knn,
+    "Score_LOF"       : score_lof
 }
 
-# repintado por caracteristicas fisiologicas
+# repintado por características fisiológicas
 fisio = {
-    "RR_mean" : vector_RR_media,
-    "RR_std"  : vector_RR_desv,
-    "LF"      : vector_LF,
-    "HF"      : vector_HF,
-    "LF_HF"   : LF_HF_ratio
+    "RR_media" : RR_media_vector,
+    "RR_desv"  : RR_desv_vector,
+    "LF"       : LF_vector,
+    "HF"       : HF_vector,
+    "LF_HF"    : LF_HF_ratio
 }
 
 for nombre, vec in fisio.items():
 
     html = f"mapper_configB_{nombre}.html"
-    mapeador.visualize(
+    kmapper.visualize(
         grafo,
         path_html           = html,
-        title               = f"Config B – repintado por {nombre}",
+        title               = f"Config B  {nombre}",
         X                   = X_num,
         X_names             = nombres_caract,
         color_values        = vec.reshape(-1, 1),
@@ -266,30 +245,30 @@ for nombre, vec in fisio.items():
     )
     print("HTML repintado:", html)
 
-    valores_nodo = media_por_nodo(grafo, vec)
+    nod = media_por_nodo(grafo, vec)
     dibujar_png(
-        grafo, pos, valores_nodo = valores_nodo,
-        titulo = f"Configuracion B – {nombre}",
+        grafo, pos, valores_nodo = nod,
+        titulo = f"Configuración B  {nombre}",
         salida = f"mapper_configB_{nombre}.png"
     )
 
-# repintado morfologia
+# repintado morfología
 morf = {
-    "AMP_max"    : vector_amp_max,
-    "AMP_min"    : vector_amp_min,
-    "AMP_range"  : rango_amp,
-    "SEG1_skew"  : vector_seg1_asim,
-    "SEG2_skew"  : vector_seg2_asim,
-    "SEG3_skew"  : vector_seg3_asim
+    "AMP_max"    : amplitud_max_vector,
+    "AMP_min"    : amplitud_min_vector,
+    "AMP_rango"  : rango_amp_vector,
+    "SEG1_asim"  : seg1_asim_vector,
+    "SEG2_asim"  : seg2_asim_vector,
+    "SEG3_asim"  : seg3_asim_vector
 }
 
 for nombre, vec in morf.items():
 
     html = f"mapper_configB_{nombre}.html"
-    mapeador.visualize(
+    kmapper.visualize(
         grafo,
         path_html           = html,
-        title               = f"Config B – repintado morfologia {nombre}",
+        title               = f"Config B {nombre}",
         X                   = X_num,
         X_names             = nombres_caract,
         color_values        = vec.reshape(-1, 1),
@@ -297,21 +276,21 @@ for nombre, vec in morf.items():
     )
     print("HTML repintado:", html)
 
-    valores_nodo = media_por_nodo(grafo, vec)
+    nod = media_por_nodo(grafo, vec)
     dibujar_png(
-        grafo, pos, valores_nodo = valores_nodo,
-        titulo = f"Configuracion B – {nombre}",
+        grafo, pos, valores_nodo = nod,
+        titulo = f"Configuración B  {nombre}",
         salida = f"mapper_configB_{nombre}.png"
     )
 
-# repintado rareza (Excentricidad_Z, kNN_Dist, LOF_score)
+# repintado rareza
 for nombre, vec in extra.items():
 
     html = f"mapper_configB_{nombre}.html"
-    mapeador.visualize(
+    kmapper.visualize(
         grafo,
         path_html           = html,
-        title               = f"Config B – rareza {nombre}",
+        title               = f"Config B  {nombre}",
         X                   = X_num,
         X_names             = nombres_caract,
         color_values        = vec.reshape(-1, 1),
@@ -319,66 +298,56 @@ for nombre, vec in extra.items():
     )
     print("HTML coloreado:", html)
 
-    valores_nodo = media_por_nodo(grafo, vec)
+    nod = media_por_nodo(grafo, vec)
     dibujar_png(
-        grafo, pos, valores_nodo = valores_nodo,
-        titulo = f"Configuracion B – {nombre}",
+        grafo, pos, valores_nodo = nod,
+        titulo = f"Configuración B  {nombre}",
         salida = f"mapper_configB_{nombre}.png"
     )
 
-# rareza compuesta, tamano por nodo y rango de amplitud
-matriz_rareza      = np.vstack([exc_z, dist_knn, score_lof]).T
-puntuacion_rareza  = zscore(matriz_rareza, axis = 0, nan_policy = "omit").mean(axis = 1)
+# rareza compuesta
+m_rareza        = np.vstack([exc_z, dist_knn, score_lof]).T
+rareza_compuesta  = zscore(m_rareza, axis = 0, nan_policy = "omit").mean(axis = 1)
 
-rareza_por_nodo    = media_por_nodo(grafo, puntuacion_rareza)
-tamano_por_nodo    = media_por_nodo(grafo, vector_RR_desv)
-umbral_amp         = np.percentile(rango_amp, 95)
-nodo_alto_rango    = media_por_nodo(grafo, (rango_amp > umbral_amp).astype(float))
+rareza_por_nodo   = media_por_nodo(grafo, rareza_compuesta)
+tamano_por_nodo   = media_por_nodo(grafo, RR_desv_vector)
+umbral_amp           = np.percentile(rango_amp_vector, 95)
+alta_amp_por_nodo = media_por_nodo(grafo, (rango_amp_vector > umbral_amp).astype(float)) # para cada nodo: proporción de ptos que superan el umbral
 
-def tamano_nodo(nid):
-    return len(grafo["nodes"][nid])
+def tamano_nodo(id_nodo):
+    return len(grafo["nodes"][id_nodo])
 
-nid_raro = max(rareza_por_nodo, key = rareza_por_nodo.get)
+id_nodo_raro = max(rareza_por_nodo, key = rareza_por_nodo.get)
 
-nodos_naranja = [n for n, v in nodo_alto_rango.items() if v > 0.5]
-nid_orange    = max(nodos_naranja, key = lambda n: rareza_por_nodo.get(n, -np.inf)) if nodos_naranja else None
+nodos_naranja = [n for n, v in alta_amp_por_nodo.items() if v > 0.5]
+id_nodo_naranja   = max(nodos_naranja, key = lambda n: rareza_por_nodo.get(n, -np.inf)) if nodos_naranja else None
 
-if nid_orange is not None:
-    elegido = nid_raro if tamano_nodo(nid_raro) <= tamano_nodo(nid_orange) else nid_orange
+if id_nodo_naranja is not None:
+    elegido = id_nodo_raro if tamano_nodo(id_nodo_raro) <= tamano_nodo(id_nodo_naranja) else id_nodo_naranja
 else:
-    elegido = nid_raro
+    elegido = id_nodo_raro
 
-print(f"[CANDIDATO] nodo seleccionado: {elegido}")
+print(f" nodo seleccionado: {elegido}")
 
-# visualizacion de rareza compuesta
+# visualización rareza compuesta
 G = grafo_a_networkx(grafo)
 
 fig, ax = plt.subplots(figsize = (10, 10))
 nx.draw_networkx_edges(G, pos, ax = ax, width = 1.2, edge_color = "#666666")
 
-tamanos_brutos = np.array([tamano_por_nodo[n] for n in G.nodes()])
-tamanos2 = 600 * (tamanos_brutos - tamanos_brutos.min()) / (tamanos_brutos.max() - tamanos_brutos.min() + 1e-8) + 50
+n_nodos_raw = np.array([tamano_por_nodo[n] for n in G.nodes()])
+n_nodos_norm = 600 * (n_nodos_raw - n_nodos_raw.min()) / (n_nodos_raw.max() - n_nodos_raw.min() + 1e-8) + 50
 
-colores = np.array([rareza_por_nodo[n] for n in G.nodes()])
-pc = nx.draw_networkx_nodes(
-    G, pos, ax = ax,
-    node_size  = tamanos2,
-    node_color = colores,
-    cmap       = "viridis"
-)
+colors = np.array([rareza_por_nodo[n] for n in G.nodes()])
+pc = nx.draw_networkx_nodes(G, pos, ax = ax, node_size = n_nodos_norm, node_color = colors, cmap = "viridis")
 
 cbar = fig.colorbar(pc, ax = ax, shrink = 0.8)
 cbar.ax.set_ylabel("rareza compuesta (media nodo)")
 
-edge_nodes = [n for n in G.nodes() if nodo_alto_rango[n] > 0.5]
-nx.draw_networkx_nodes(
-    G, pos, nodelist = edge_nodes,
-    node_size  = tamanos2[[list(G.nodes()).index(n) for n in edge_nodes]],
-    node_color = "none",
-    edgecolors = "orange",
-    linewidths = 1.8,
-    ax         = ax
-)
+nodos_extr = [n for n in G.nodes() if alta_amp_por_nodo[n] > 0.5] # mas del 50% de sus ptos tienen amplitud extrema
+nx.draw_networkx_nodes(G, pos, nodelist = nodos_extr,
+                      node_size = n_nodos_norm[[list(G.nodes()).index(n) for n in nodos_extr]],
+                      node_color = "none", edgecolors = "orange", linewidths = 1.8, ax = ax)
 
 ax.set_axis_off()
 fig.tight_layout()
@@ -387,38 +356,28 @@ plt.close(fig)
 print("PNG: mapper_configB_integrado.png")
 
 # repintado por ratio LF/HF
-lfhf_por_nodo   = media_por_nodo(grafo, LF_HF_ratio)
-nodo_alto_rango2 = media_por_nodo(grafo, (rango_amp > umbral_amp).astype(float))
-tamano_por_nodo2 = tamano_por_nodo
+lfhf_por_nodo      = media_por_nodo(grafo, LF_HF_ratio)
+alta_amp_por_nodo2 = alta_amp_por_nodo
+tamano_por_nodo2   = tamano_por_nodo
 
-tamanos_brutos2 = np.array([tamano_por_nodo2[n] for n in G.nodes()])
-tamanos3 = 600 * (tamanos_brutos2 - tamanos_brutos2.min()) / (tamanos_brutos2.max() - tamanos_brutos2.min() + 1e-8) + 100
+n_nodos_raw2 = np.array([tamano_por_nodo2[n] for n in G.nodes()])
+n_nodos_norm2 = 600 * (n_nodos_raw2 - n_nodos_raw2.min()) / (n_nodos_raw2.max() - n_nodos_raw2.min() + 1e-8) + 100
 
-colores2 = np.array([lfhf_por_nodo[n] for n in G.nodes()])
+colors2 = np.array([lfhf_por_nodo[n] for n in G.nodes()])
 
 fig, ax = plt.subplots(figsize = (10, 10))
 nx.draw_networkx_edges(G, pos, ax = ax, width = 1.2, edge_color = "#666666")
 
-pc2 = nx.draw_networkx_nodes(
-    G, pos, ax = ax,
-    node_size  = tamanos3,
-    node_color = colores2,
-    cmap       = "viridis"
-)
-cbar2 = fig.colorbar(pc2, ax = ax, shrink = 0.8)
-cbar2.ax.set_ylabel("LF/HF (media por nodo)")
+pc = nx.draw_networkx_nodes(G, pos, ax = ax, node_size = n_nodos_norm2, node_color = colors2, cmap = "viridis")
+cbar = fig.colorbar(pc, ax = ax, shrink = 0.8)
+cbar.ax.set_ylabel("LF/HF (media por nodo)")
 
-edge_nodes = [n for n in G.nodes() if nodo_alto_rango2[n] > 0.5]
-nx.draw_networkx_nodes(
-    G, pos, nodelist = edge_nodes,
-    node_size  = tamanos3[[list(G.nodes()).index(n) for n in edge_nodes]],
-    node_color = "none",
-    edgecolors = "orange",
-    linewidths = 2.5,
-    ax         = ax
-)
+nodos_extr = [n for n in G.nodes() if alta_amp_por_nodo2[n] > 0.5]
+nx.draw_networkx_nodes(G, pos, nodelist = nodos_extr,
+                      node_size = n_nodos_norm2[[list(G.nodes()).index(n) for n in nodos_extr]],
+                      node_color = "none", edgecolors = "orange", linewidths = 2.5, ax = ax)
 
-ax.set_title("Config B – color = LF/HF")
+ax.set_title("Config B  color = LF/HF")
 ax.set_axis_off()
 fig.tight_layout()
 fig.savefig("mapper_configB_integrado_LFHF.png", dpi = 300)
