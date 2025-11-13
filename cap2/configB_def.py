@@ -91,43 +91,33 @@ rango_amp_vector = amplitud_max_vector - amplitud_min_vector
 # para el grafo
 def grafo_a_networkx(dic):
     G = nx.Graph()
-    for nid, miembros in dic["nodes"].items():
-        G.add_node(nid, tamaño = len(miembros))
-
-    enlaces = dic.get("links", [])
-    if isinstance(enlaces, dict):
-        for a, vec in enlaces.items():
-            for b in vec:
-                G.add_edge(a, b)
-    else:
-        for link in enlaces:
-            if isinstance(link, (list, tuple)) and len(link) >= 2:
-                G.add_edge(link[0], link[1])
-            elif isinstance(link, dict):
-                a = link.get("source", link.get("from"))
-                b = link.get("target", link.get("to"))
-                if a is not None and b is not None:
-                    G.add_edge(a, b)
+    
+    for id_nodo, indices in dic["nodes"].items():
+        G.add_node(id_nodo, tamaño=len(indices))
+    enlaces = dic.get("links", [])   
+    for origen, destino in enlaces:
+        G.add_edge(origen, destino)
+    
     return G
 
 def posiciones_umap(dic, umap_coords):
     pos = {}
-    for nid, idxs in dic["nodes"].items():
+    for id_nodo, idxs in dic["nodes"].items():
         pts = umap_coords[np.array(idxs)]
-        pos[nid] = pts.mean(axis = 0)
+        pos[id_nodo] = pts.mean(axis = 0)
     return pos
 
 def dibujar_png(dic, pos, valores_nodo = None, titulo = "", salida = "salida.png",
                 vmin = None, vmax = None):
 
     G = grafo_a_networkx(dic)
-    tamaños = [max(10, np.log10(G.nodes[n]["tamaño"] + 1) * 60) for n in G.nodes()]
+    tamanos = [max(10, np.log10(G.nodes[n]["tamano"] + 1) * 60) for n in G.nodes()]
 
     fig, ax = plt.subplots(figsize = (10, 10))
     nx.draw_networkx_edges(G, pos, ax = ax, width = 1.2, edge_color = "#666666")
 
     if valores_nodo is None:
-        nx.draw_networkx_nodes(G, pos, ax = ax, node_size = tamaños, node_color = "#3182bd")
+        nx.draw_networkx_nodes(G, pos, ax = ax, node_size = tamanos, node_color = "#3182bd")
 
     else:
         vals   = np.array([valores_nodo.get(n, np.nan) for n in G.nodes()])
@@ -136,7 +126,7 @@ def dibujar_png(dic, pos, valores_nodo = None, titulo = "", salida = "salida.png
         vals   = np.nan_to_num(vals, nan = fill, posinf = fin.max() if fin.size > 0 else 0,
                                          neginf = fin.min() if fin.size > 0 else 0)
 
-        nodos  = nx.draw_networkx_nodes(G, pos, ax = ax, node_size = tamaños,
+        nodos  = nx.draw_networkx_nodes(G, pos, ax = ax, node_size = tamanos,
                                         node_color = vals, cmap = "viridis",
                                         vmin = vmin, vmax = vmax)
 
@@ -157,11 +147,11 @@ def dibujar_png(dic, pos, valores_nodo = None, titulo = "", salida = "salida.png
     print("PNG:", salida)
 
 def media_por_nodo(dic, vec):
-    return {nid: float(np.mean(vec[np.array(idxs)]))
-            for nid, idxs in dic["nodes"].items()}
+    return {id_nodo: float(np.mean(vec[np.array(idxs)]))
+            for id_nodo, idxs in dic["nodes"].items()}
 
 # construcción Mapper
-mapeador    = km.KeplerMapper(verbose = 1)
+kmapper    = km.KeplerMapper(verbose = 1)
 cubrimiento = km.Cover(n_cubes = 22, perc_overlap = 0.50)
 
 clusterer = hdbscan.HDBSCAN(
@@ -170,7 +160,7 @@ clusterer = hdbscan.HDBSCAN(
     prediction_data  = True
 )
 
-grafo = mapeador.map(
+grafo = kmapper.map(
     exc_z.reshape(-1, 1),
     X_pca,
     cover     = cubrimiento,
@@ -200,7 +190,7 @@ print(
 X_num  = pd.DataFrame(X, columns = nombres_caract).values
 html_B = "mapper_configuracionB.html"
 
-mapeador.visualize(
+kmapper.visualize(
     grafo,
     path_html           = html_B,
     title               = "Configuración B",
@@ -244,7 +234,7 @@ fisio = {
 for nombre, vec in fisio.items():
 
     html = f"mapper_configB_{nombre}.html"
-    mapeador.visualize(
+    kmapper.visualize(
         grafo,
         path_html           = html,
         title               = f"Config B  {nombre}",
@@ -275,7 +265,7 @@ morf = {
 for nombre, vec in morf.items():
 
     html = f"mapper_configB_{nombre}.html"
-    mapeador.visualize(
+    kmapper.visualize(
         grafo,
         path_html           = html,
         title               = f"Config B {nombre}",
@@ -297,7 +287,7 @@ for nombre, vec in morf.items():
 for nombre, vec in extra.items():
 
     html = f"mapper_configB_{nombre}.html"
-    mapeador.visualize(
+    kmapper.visualize(
         grafo,
         path_html           = html,
         title               = f"Config B  {nombre}",
@@ -316,28 +306,28 @@ for nombre, vec in extra.items():
     )
 
 # rareza compuesta
-rare_stack        = np.vstack([exc_z, dist_knn, score_lof]).T
-rareza_compuesta  = zscore(rare_stack, axis = 0, nan_policy = "omit").mean(axis = 1)
+m_rareza        = np.vstack([exc_z, dist_knn, score_lof]).T
+rareza_compuesta  = zscore(m_rareza, axis = 0, nan_policy = "omit").mean(axis = 1)
 
 rareza_por_nodo   = media_por_nodo(grafo, rareza_compuesta)
-tamaño_por_nodo   = media_por_nodo(grafo, RR_desv_vector)
+tamano_por_nodo   = media_por_nodo(grafo, RR_desv_vector)
 thr_amp           = np.percentile(rango_amp_vector, 95)
 alto_amp_por_nodo = media_por_nodo(grafo, (rango_amp_vector > thr_amp).astype(float))
 
-def tamaño_nodo(nid):
-    return len(grafo["nodes"][nid])
+def tamano_nodo(id_nodo):
+    return len(grafo["nodes"][id_nodo])
 
-nid_raro = max(rareza_por_nodo, key = rareza_por_nodo.get)
+id_nodo_raro = max(rareza_por_nodo, key = rareza_por_nodo.get)
 
 nodos_naranja = [n for n, v in alto_amp_por_nodo.items() if v > 0.5]
-nid_naranja   = max(nodos_naranja, key = lambda n: rareza_por_nodo.get(n, -np.inf)) if nodos_naranja else None
+id_nodo_naranja   = max(nodos_naranja, key = lambda n: rareza_por_nodo.get(n, -np.inf)) if nodos_naranja else None
 
-if nid_naranja is not None:
-    elegido = nid_raro if tamaño_nodo(nid_raro) <= tamaño_nodo(nid_naranja) else nid_naranja
+if id_nodo_naranja is not None:
+    elegido = id_nodo_raro if tamano_nodo(id_nodo_raro) <= tamano_nodo(id_nodo_naranja) else id_nodo_naranja
 else:
-    elegido = nid_raro
+    elegido = id_nodo_raro
 
-print(f"[CANDIDATO] nodo seleccionado: {elegido}")
+print(f" nodo seleccionado: {elegido}")
 
 # visualización rareza compuesta
 G = grafo_a_networkx(grafo)
@@ -345,7 +335,7 @@ G = grafo_a_networkx(grafo)
 fig, ax = plt.subplots(figsize = (10, 10))
 nx.draw_networkx_edges(G, pos, ax = ax, width = 1.2, edge_color = "#666666")
 
-sizes_raw = np.array([tamaño_por_nodo[n] for n in G.nodes()])
+sizes_raw = np.array([tamano_por_nodo[n] for n in G.nodes()])
 sizes2 = 600 * (sizes_raw - sizes_raw.min()) / (sizes_raw.max() - sizes_raw.min() + 1e-8) + 50
 
 colors = np.array([rareza_por_nodo[n] for n in G.nodes()])
@@ -368,9 +358,9 @@ print("PNG: mapper_configB_integrado.png")
 # repintado por ratio LF/HF
 lfhf_por_nodo      = media_por_nodo(grafo, LF_HF_ratio)
 alto_amp_por_nodo2 = alto_amp_por_nodo
-tamaño_por_nodo2   = tamaño_por_nodo
+tamano_por_nodo2   = tamano_por_nodo
 
-sizes_raw2 = np.array([tamaño_por_nodo2[n] for n in G.nodes()])
+sizes_raw2 = np.array([tamano_por_nodo2[n] for n in G.nodes()])
 sizes3 = 600 * (sizes_raw2 - sizes_raw2.min()) / (sizes_raw2.max() - sizes_raw2.min() + 1e-8) + 100
 
 colors2 = np.array([lfhf_por_nodo[n] for n in G.nodes()])
@@ -394,3 +384,4 @@ fig.savefig("mapper_configB_integrado_LFHF.png", dpi = 300)
 plt.close(fig)
 
 print("Fin")
+
