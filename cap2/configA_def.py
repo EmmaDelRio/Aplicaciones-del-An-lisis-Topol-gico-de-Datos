@@ -46,14 +46,14 @@ lente_umap = umap.UMAP(
 ).fit_transform(X_pca)
 
 # Cubrimiento 14×14, 50% y algoritmo clustering HDBSCAN
-mapeador = km.KeplerMapper(verbose = 1)
-cover = km.Cover(n_cubes=14, perc_overlap = 0.50)
+kmapper = km.KeplerMapper(verbose = 1)
+cubrimiento = km.cubrimiento(n_cubes=14, perc_overlap = 0.50)
 clusterer = hdbscan.HDBSCAN(min_cluster_size = 40, min_samples = 5, prediction_data = True)
 
-grafo = mapeador.map(
+grafo = kmapper.map(
     lente_umap,
     X_pca,
-    cover = cover,
+    cover = cubrimiento,
     clusterer = clusterer
 )
 
@@ -63,7 +63,7 @@ nombres_X = nombres_caracteristicas[:]
 
 # HTML
 html_base = "mapper_configA.html"
-mapeador.visualize(
+kmapper.visualize(
     grafo,
     path_html = html_base,
     title = "Configuración A",
@@ -185,7 +185,7 @@ for nombre in campos_color:
         vector = X[:, nombres_caracteristicas.index(nombre)]
 
     html = f"mapper_configA_{nombre}.html"
-    mapeador.visualize(
+    kmapper.visualize(
         grafo,
         path_html = html,
         title = f"Configuración A coloreado por {nombre}",
@@ -205,5 +205,6 @@ for nombre in campos_color:
     )
 
 print("Fin")
+
 
 
