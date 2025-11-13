@@ -311,15 +311,15 @@ rareza_compuesta  = zscore(m_rareza, axis = 0, nan_policy = "omit").mean(axis = 
 
 rareza_por_nodo   = media_por_nodo(grafo, rareza_compuesta)
 tamano_por_nodo   = media_por_nodo(grafo, RR_desv_vector)
-thr_amp           = np.percentile(rango_amp_vector, 95)
-alto_amp_por_nodo = media_por_nodo(grafo, (rango_amp_vector > thr_amp).astype(float))
+umbral_amp           = np.percentile(rango_amp_vector, 95)
+alta_amp_por_nodo = media_por_nodo(grafo, (rango_amp_vector > umbral_amp).astype(float)) # para cada nodo: proporción de ptos que superan el umbral
 
 def tamano_nodo(id_nodo):
     return len(grafo["nodes"][id_nodo])
 
 id_nodo_raro = max(rareza_por_nodo, key = rareza_por_nodo.get)
 
-nodos_naranja = [n for n, v in alto_amp_por_nodo.items() if v > 0.5]
+nodos_naranja = [n for n, v in alta_amp_por_nodo.items() if v > 0.5]
 id_nodo_naranja   = max(nodos_naranja, key = lambda n: rareza_por_nodo.get(n, -np.inf)) if nodos_naranja else None
 
 if id_nodo_naranja is not None:
@@ -335,18 +335,18 @@ G = grafo_a_networkx(grafo)
 fig, ax = plt.subplots(figsize = (10, 10))
 nx.draw_networkx_edges(G, pos, ax = ax, width = 1.2, edge_color = "#666666")
 
-sizes_raw = np.array([tamano_por_nodo[n] for n in G.nodes()])
-sizes2 = 600 * (sizes_raw - sizes_raw.min()) / (sizes_raw.max() - sizes_raw.min() + 1e-8) + 50
+n_nodos_raw = np.array([tamano_por_nodo[n] for n in G.nodes()])
+n_nodos_norm = 600 * (n_nodos_raw - n_nodos_raw.min()) / (n_nodos_raw.max() - n_nodos_raw.min() + 1e-8) + 50
 
 colors = np.array([rareza_por_nodo[n] for n in G.nodes()])
-pc = nx.draw_networkx_nodes(G, pos, ax = ax, node_size = sizes2, node_color = colors, cmap = "viridis")
+pc = nx.draw_networkx_nodes(G, pos, ax = ax, node_size = n_nodos_norm, node_color = colors, cmap = "viridis")
 
 cbar = fig.colorbar(pc, ax = ax, shrink = 0.8)
 cbar.ax.set_ylabel("rareza compuesta (media nodo)")
 
-edge_nodes = [n for n in G.nodes() if alto_amp_por_nodo[n] > 0.5]
-nx.draw_networkx_nodes(G, pos, nodelist = edge_nodes,
-                      node_size = sizes2[[list(G.nodes()).index(n) for n in edge_nodes]],
+nodos_extr = [n for n in G.nodes() if alta_amp_por_nodo[n] > 0.5] # mas del 50% de sus ptos tienen amplitud extrema
+nx.draw_networkx_nodes(G, pos, nodelist = nodos_extr,
+                      node_size = n_nodos_norm[[list(G.nodes()).index(n) for n in nodos_extr]],
                       node_color = "none", edgecolors = "orange", linewidths = 1.8, ax = ax)
 
 ax.set_axis_off()
@@ -357,24 +357,24 @@ print("PNG: mapper_configB_integrado.png")
 
 # repintado por ratio LF/HF
 lfhf_por_nodo      = media_por_nodo(grafo, LF_HF_ratio)
-alto_amp_por_nodo2 = alto_amp_por_nodo
+alta_amp_por_nodo2 = alta_amp_por_nodo
 tamano_por_nodo2   = tamano_por_nodo
 
-sizes_raw2 = np.array([tamano_por_nodo2[n] for n in G.nodes()])
-sizes3 = 600 * (sizes_raw2 - sizes_raw2.min()) / (sizes_raw2.max() - sizes_raw2.min() + 1e-8) + 100
+n_nodos_raw2 = np.array([tamano_por_nodo2[n] for n in G.nodes()])
+n_nodos_norm2 = 600 * (n_nodos_raw2 - n_nodos_raw2.min()) / (n_nodos_raw2.max() - n_nodos_raw2.min() + 1e-8) + 100
 
 colors2 = np.array([lfhf_por_nodo[n] for n in G.nodes()])
 
 fig, ax = plt.subplots(figsize = (10, 10))
 nx.draw_networkx_edges(G, pos, ax = ax, width = 1.2, edge_color = "#666666")
 
-pc = nx.draw_networkx_nodes(G, pos, ax = ax, node_size = sizes3, node_color = colors2, cmap = "viridis")
+pc = nx.draw_networkx_nodes(G, pos, ax = ax, node_size = n_nodos_norm2, node_color = colors2, cmap = "viridis")
 cbar = fig.colorbar(pc, ax = ax, shrink = 0.8)
 cbar.ax.set_ylabel("LF/HF (media por nodo)")
 
-edge_nodes = [n for n in G.nodes() if alto_amp_por_nodo2[n] > 0.5]
-nx.draw_networkx_nodes(G, pos, nodelist = edge_nodes,
-                      node_size = sizes3[[list(G.nodes()).index(n) for n in edge_nodes]],
+nodos_extr = [n for n in G.nodes() if alta_amp_por_nodo2[n] > 0.5]
+nx.draw_networkx_nodes(G, pos, nodelist = nodos_extr,
+                      node_size = n_nodos_norm2[[list(G.nodes()).index(n) for n in nodos_extr]],
                       node_color = "none", edgecolors = "orange", linewidths = 2.5, ax = ax)
 
 ax.set_title("Config B  color = LF/HF")
@@ -384,4 +384,5 @@ fig.savefig("mapper_configB_integrado_LFHF.png", dpi = 300)
 plt.close(fig)
 
 print("Fin")
+
 
