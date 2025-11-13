@@ -14,7 +14,7 @@ import matplotlib as mpl
 import networkx as nx
 
 # Entradas
-RUTA_X = Path("X_mapper.npy")
+RUTA_X = Path("X_mapper.npy") 
 assert RUTA_X.exists(), "Archivo no encontrado"
 
 X = np.load(RUTA_X)
@@ -31,48 +31,49 @@ nombres_caracteristicas = [
 # Escalado y PCA
 escalador = StandardScaler()
 X_escalado = escalador.fit_transform(X)
-pca = PCA(n_components=10, random_state=42)
+pca = PCA(n_components=10, random_state = 42)
 X_pca = pca.fit_transform(X_escalado)
 
-print("Varianza explicada acumulada:", pca.explained_variance_ratio_.cumsum()[-1])
+print("Varianza explicada acumulada:", pca.explained_variance_ratio_.cumsum()[-1]) # comprobamos que no estamos perdiendo información
 
 # Función filtro: UMAP 2D
 lente_umap = umap.UMAP(
-    n_neighbors=80,
-    min_dist=0.10,
-    n_components=2, 
-    metric="euclidean",
-    random_state=42
+    n_neighbors = 80,
+    min_dist = 0.10,
+    n_components = 2, 
+    metric = "euclidean",
+    random_state = 42
 ).fit_transform(X_pca)
 
-# Cover 14×14, 50% + HDBSCAN
-mapeador = km.KeplerMapper(verbose=1)
-cover = km.Cover(n_cubes=14, perc_overlap=0.50)
-clusterer = hdbscan.HDBSCAN(min_cluster_size=40, min_samples=5, prediction_data=True)
+# Cubrimiento 14×14, 50% y algoritmo clustering HDBSCAN
+mapeador = km.KeplerMapper(verbose = 1)
+cover = km.Cover(n_cubes=14, perc_overlap = 0.50)
+clusterer = hdbscan.HDBSCAN(min_cluster_size = 40, min_samples = 5, prediction_data = True)
 
 grafo = mapeador.map(
     lente_umap,
     X_pca,
-    cover=cover,
-    clusterer=clusterer
+    cover = cover,
+    clusterer = clusterer
 )
 
 # Datos numéricos para las estadísticas
-X_numerico = pd.DataFrame(X, columns=nombres_caracteristicas).values
+X_numerico = pd.DataFrame(X, columns = nombres_caracteristicas).values
 nombres_X = nombres_caracteristicas[:]
 
-# HTML base sin tooltips
+# HTML
 html_base = "mapper_configA.html"
 mapeador.visualize(
     grafo,
-    path_html=html_base,
-    title="Configuración A",
-    X=X_numerico,
-    X_names=nombres_X
+    path_html = html_base,
+    title = "Configuración A",
+    X = X_numerico,
+    X_names = nombres_X
 )
 print("HTML completado")
 
 def calcular_posiciones_nodos(diccionario_grafo, lente_2d):
+    # grafo y coordenadas 2d -> diccionario con la posición de cada nodo    
     posiciones = {}
     for id_nodo, indices in diccionario_grafo["nodos"].items():
         puntos = lente_2d[np.array(indices)]
@@ -81,35 +82,28 @@ def calcular_posiciones_nodos(diccionario_grafo, lente_2d):
 
 def convertir_grafo_a_nx(diccionario_grafo):
     G = nx.Graph()
+    # añadir nodos 
     for id_nodo, miembros in diccionario_grafo["nodos"].items():
-        G.add_node(id_nodo, tamano=len(miembros))
-    enlaces = diccionario_grafo.get("enlaces", [])
-    if isinstance(enlaces, dict):
-        for a, vecinos in enlaces.items():
-            for b in vecinos:
-                G.add_edge(a, b)
-    else:
-        for enlace in enlaces:
-            if isinstance(enlace, (list, tuple)) and len(enlace) >= 2:
-                G.add_edge(enlace[0], enlace[1])
-            elif isinstance(enlace, dict):
-                a = enlace.get("source", enlace.get("from"))
-                b = enlace.get("target", enlace.get("to"))
-                if a is not None and b is not None:
-                    G.add_edge(a, b)
+        G.add_node(id_nodo, tamano=len(miembros))  
+    # añadir aristas
+    aristas = diccionario_grafo.get("aristas", [])
+    for arista in aristas:
+        if isinstance(arista, (list, tuple)) and len(arista) == 2:
+            G.add_edge(arista[0], arista[1])
+    
     return G
 
-def dibujar_png(diccionario_grafo, posiciones, valores_nodos=None,
-                titulo="", salida="salida.png", vmin=None, vmax=None,
-                tamano_titulo=16):
+def dibujar_png(diccionario_grafo, posiciones, valores_nodos = None,
+                titulo="", salida = "salida.png", vmin = None, vmax = None,
+                tamano_titulo = 16):
     G = convertir_grafo_a_nx(diccionario_grafo)
     tamanos = [max(10, np.log10(G.nodes[n]["tamano"] + 1) * 60) for n in G.nodes()]
     fig, ax = plt.subplots(figsize=(10, 10))
 
-    nx.draw_networkx_edges(G, posiciones, ax=ax, width=1.2, edge_color="#666666")
+    nx.draw_networkx_edges(G, posiciones, ax = ax, width = 1.2, edge_color = "#666666")
 
     if valores_nodos is None:
-        nx.draw_networkx_nodes(G, posiciones, ax=ax, node_size=tamanos, node_color="#3182bd")
+        nx.draw_networkx_nodes(G, posiciones, ax = ax, node_size = tamanos, node_color = "#3182bd")
     else:
         valores = np.array([valores_nodos.get(n, np.nan) for n in G.nodes()])
         finitos = valores[np.isfinite(valores)]
@@ -117,12 +111,12 @@ def dibujar_png(diccionario_grafo, posiciones, valores_nodos=None,
             valores[:] = 0.0
         else:
             relleno = np.nanmedian(finitos)
-            valores = np.nan_to_num(valores, nan=relleno, posinf=finitos.max(), neginf=finitos.min())
+            valores = np.nan_to_num(valores, nan = relleno, posinf = finitos.max(), neginf = finitos.min())
 
         mapeable = nx.draw_networkx_nodes(
-            G, posiciones, ax=ax,
-            node_size=tamanos, node_color=valores,
-            cmap="viridis", vmin=vmin, vmax=vmax
+            G, posiciones, ax = ax,
+            node_size = tamanos, node_color = valores,
+            cmap = "viridis", vmin = vmin, vmax = vmax
         )
         norm = mpl.colors.Normalize(
             vmin=mapeable.get_array().min() if vmin is None else vmin,
@@ -130,9 +124,9 @@ def dibujar_png(diccionario_grafo, posiciones, valores_nodos=None,
         )
         sm = mpl.cm.ScalarMappable(cmap=mapeable.get_cmap(), norm=norm)
         sm.set_array([])
-        fig.colorbar(sm, ax=ax, shrink=0.8).ax.set_ylabel("valor medio por nodo")
+        fig.colorbar(sm, ax = ax, shrink = 0.8).ax.set_ylabel("valor medio por nodo")
 
-    ax.set_title(titulo, fontsize=tamano_titulo)
+    ax.set_title(titulo, fontsize = tamano_titulo)
     ax.set_axis_off()
     fig.tight_layout()
     fig.savefig(salida, dpi=300)
@@ -166,18 +160,18 @@ posiciones = calcular_posiciones_nodos(grafo, lente_umap)
 # Grafo base
 dibujar_png(
     grafo, posiciones,
-    titulo="Configuración A",
-    tamano_titulo=25,
-    salida="A_base.png"
+    titulo= " Configuración A",
+    tamano_titulo = 25,
+    salida = "A_base.png"
 )
 
-# Colores por características
+# Colorear por características
 campos_color = ["RR_media", "RR_desv", "LF", "HF", "LF_HF_ratio", "amp_max", "amp_min"]
 
 if "LF" in nombres_caracteristicas and "HF" in nombres_caracteristicas:
     lf = X[:, nombres_caracteristicas.index("LF")]
     hf = X[:, nombres_caracteristicas.index("HF")]
-    hf_seguro = np.clip(hf, 1e-8, np.percentile(hf, 99.9))
+    hf_seguro = np.clip(hf, 1e-8, np.percentile(hf, 99.9)) #evitar dividir entre 0
     relacion_lf_hf = lf / hf_seguro
 else:
     relacion_lf_hf = None
@@ -193,21 +187,22 @@ for nombre in campos_color:
     html = f"mapper_configA_{nombre}.html"
     mapeador.visualize(
         grafo,
-        path_html=html,
-        title=f"Configuración A coloreado por {nombre}",
-        X=X_numerico,
-        X_names=nombres_X,
-        color_values=vector.reshape(-1, 1),
-        color_function_name=["mean"]
+        path_html = html,
+        title = f"Configuración A coloreado por {nombre}",
+        X = X_numerico,
+        X_names = nombres_X,
+        color_values = vector.reshape(-1, 1),
+        color_function_name = ["mean"]
     )
     print(f"HTML coloreado: {html}")
 
     valores_nodos = agregar_media_por_nodo(grafo, vector)
     dibujar_png(
         grafo, posiciones,
-        valores_nodos=valores_nodos,
-        titulo=f"Configuración A : {nombre}",
-        salida=f"mapper_configA_{nombre}.png"
+        valores_nodos = valores_nodos,
+        titulo = f"Configuración A : {nombre}",
+        salida = f"mapper_configA_{nombre}.png"
     )
 
 print("Fin")
+
