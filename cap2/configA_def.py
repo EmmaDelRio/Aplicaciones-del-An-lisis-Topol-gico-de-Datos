@@ -73,9 +73,9 @@ mapeador.visualize(
 print("HTML completado")
 
 def calcular_posiciones_nodos(diccionario_grafo, lente_2d):
-    # grafo y coordenadas 2d -> diccionario con la posición de cada nodo    
+    # grafo y coordenadas 2d -> diccionario con la posición de cada nodo  
     posiciones = {}
-    for id_nodo, indices in diccionario_grafo["nodos"].items():
+    for id_nodo, indices in diccionario_grafo["nodes"].items():
         puntos = lente_2d[np.array(indices)]
         posiciones[id_nodo] = puntos.mean(axis=0)
     return posiciones
@@ -83,10 +83,10 @@ def calcular_posiciones_nodos(diccionario_grafo, lente_2d):
 def convertir_grafo_a_nx(diccionario_grafo):
     G = nx.Graph()
     # añadir nodos 
-    for id_nodo, miembros in diccionario_grafo["nodos"].items():
+    for id_nodo, miembros in diccionario_grafo["nodes"].items():
         G.add_node(id_nodo, tamano=len(miembros))  
     # añadir aristas
-    aristas = diccionario_grafo.get("aristas", [])
+    aristas = diccionario_grafo.get("links", [])
     for arista in aristas:
         if isinstance(arista, (list, tuple)) and len(arista) == 2:
             G.add_edge(arista[0], arista[1])
@@ -135,7 +135,7 @@ def dibujar_png(diccionario_grafo, posiciones, valores_nodos = None,
 
 def agregar_media_por_nodo(diccionario_grafo, vector):
     return {id_nodo: float(np.mean(vector[np.array(indices)]))
-            for id_nodo, indices in diccionario_grafo["nodos"].items()}
+            for id_nodo, indices in diccionario_grafo["nodes"].items()}
 
 # Resumen del grafo
 G = convertir_grafo_a_nx(grafo)
@@ -205,4 +205,5 @@ for nombre in campos_color:
     )
 
 print("Fin")
+
 
