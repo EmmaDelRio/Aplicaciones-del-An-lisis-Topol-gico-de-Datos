@@ -70,7 +70,7 @@ def grafo_a_networkx(dic_grafo):
     G = nx.Graph()
     
     for id_nodo, indices_puntos in dic_grafo["nodes"].items():
-        G.add_node(id_nodo, tamano=len(indices_puntos))
+        G.add_node(id_nodo, tamano = len(indices_puntos))
     
     for origen, destino in dic_grafo.get("links", []):
         G.add_edge(origen, destino)
@@ -122,7 +122,7 @@ def dibujar_png(dic_grafo, posiciones, valores_nodo = None,
     ax.set_title(titulo, fontsize = tam_titulo)
     ax.set_axis_off()
     fig.tight_layout()
-    fig.savefig(salida, dpi=300)
+    fig.savefig(salida, dpi = 300)
     plt.close(fig)
     print(f"PNG: {salida}")
 
@@ -167,11 +167,11 @@ X_numerico = pd.DataFrame(X, columns=nombres_caracteristicas).values
 html_base = "mapper_configuracionB.html"
 kmapper.visualize(
     grafo,
-    path_html=html_base,
-    title="Configuración B",
-    X=X_numerico, X_names=nombres_caracteristicas,
-    color_values=ecc_z.reshape(-1, 1),
-    color_function_name=["mean"]
+    path_html = html_base,
+    title = "Configuración B",
+    X = X_numerico, X_names = nombres_caracteristicas,
+    color_values = ecc_z.reshape(-1, 1),
+    color_function_name = ["mean"]
 )
 print("HTML generado:", html_base)
 
@@ -181,9 +181,9 @@ posiciones = posiciones_desde_umap(grafo, umap_2d)
 
 dibujar_png(
     grafo, posiciones,
-    titulo="Configuración B",
-    tam_titulo=25,
-    salida="configB_base.png"
+    titulo = "Configuración B",
+    tam_titulo = 25,
+    salida = "configB_base.png"
 )
 
 # métricas extra
@@ -225,3 +225,4 @@ for nombre, vec in metricas_extra.items():
     )
 
 print("Fin")
+
